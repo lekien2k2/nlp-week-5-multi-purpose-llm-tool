@@ -1,0 +1,283 @@
+"""Main Flask application"""
+
+import os
+import sys
+from flask import Flask, render_template, request, jsonify, send_file
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Import models
+from models import call_model
+from models.openai_model import OPENAI_API_KEY
+from models.deepseek_model import DEEPSEEK_API_KEY
+from models.gemini_model import GEMINI_API_KEY
+
+# Import utilities
+from utils import (
+    TASK_PROMPTS,
+    is_vietnamese,
+    add_language_instruction,
+    save_history,
+    load_history,
+)
+
+app = Flask(__name__)
+app.template_folder = "templates"
+
+
+def compare_models(prompt, model_providers):
+    """Run the same prompt on multiple models concurrently"""
+    results = {}
+
+    def run_model(model_provider):
+        try:
+            result = call_model(prompt, model_provider)
+            return model_provider, result, None
+        except Exception as e:
+            return model_provider, None, str(e)
+
+    # Run all models concurrently
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {
+            executor.submit(run_model, provider): provider
+            for provider in model_providers
+        }
+
+        for future in as_completed(futures):
+            model_provider, result, error = future.result()
+            if error:
+                results[model_provider] = {"result": None, "error": error}
+            else:
+                results[model_provider] = {"result": result, "error": None}
+
+    return results
+
+
+@app.route("/")
+def index():
+    """Render the main page"""
+    return render_template("index.html")
+
+
+@app.route("/process", methods=["POST"])
+def process():
+    """Process the user's request"""
+    data = request.json
+    user_text = data.get("text", "").strip()
+    task = data.get("task", "")
+    model_provider = data.get("model", "gpt").lower()
+    custom_prompt = data.get("custom_prompt", "").strip()
+    save_to_history = data.get("save_history", True)
+
+    if not user_text:
+        return jsonify({"error": "Please enter some text"}), 400
+
+    # Validate task (allow "chat" as a special task)
+    valid_tasks = list(TASK_PROMPTS.keys()) + ["chat"]
+    if task not in valid_tasks and not custom_prompt:
+        return jsonify({"error": "Invalid task"}), 400
+
+    # Validate model provider
+    valid_providers = ["gpt", "deepseek", "gemini"]
+    if model_provider not in valid_providers:
+        return (
+            jsonify(
+                {
+                    "error": f'Invalid model provider. Must be one of: {", ".join(valid_providers)}'
+                }
+            ),
+            400,
+        )
+
+    # Create the full prompt
+    if custom_prompt:
+        prompt = custom_prompt
+    elif task == "chat":
+        # For chat, use user_text directly without any prompt template
+        prompt = user_text
+    else:
+        prompt = TASK_PROMPTS[task] + user_text
+        # Add Vietnamese instruction if needed
+        prompt = add_language_instruction(prompt, user_text, task)
+
+    # Call the appropriate model
+    result = call_model(prompt, model_provider)
+
+    # Save to history
+    if save_to_history:
+        save_history(
+            user_text,
+            task,
+            prompt,
+            model_provider,
+            result,
+            custom_prompt if custom_prompt else None,
+        )
+
+    return jsonify({"result": result, "prompt": prompt})
+
+
+@app.route("/compare", methods=["POST"])
+def compare():
+    """Compare results from multiple models"""
+    data = request.json
+    user_text = data.get("text", "").strip()
+    task = data.get("task", "")
+    model_providers = data.get("models", [])
+    custom_prompt = data.get("custom_prompt", "").strip()
+    save_to_history = data.get("save_history", True)
+
+    if not user_text:
+        return jsonify({"error": "Please enter some text"}), 400
+
+    if not model_providers:
+        return jsonify({"error": "Please select at least one model"}), 400
+
+    # Validate task (allow "chat" as a special task)
+    valid_tasks = list(TASK_PROMPTS.keys()) + ["chat"]
+    if task not in valid_tasks and not custom_prompt:
+        return jsonify({"error": "Invalid task"}), 400
+
+    # Validate model providers
+    valid_providers = ["gpt", "deepseek", "gemini"]
+    for provider in model_providers:
+        if provider not in valid_providers:
+            return jsonify({"error": f"Invalid model provider: {provider}"}), 400
+
+    # Create the full prompt
+    if custom_prompt:
+        prompt = custom_prompt
+    elif task == "chat":
+        # For chat, use user_text directly without any prompt template
+        prompt = user_text
+    else:
+        prompt = TASK_PROMPTS[task] + user_text
+        # Add Vietnamese instruction if needed
+        prompt = add_language_instruction(prompt, user_text, task)
+
+    # Compare models
+    results = compare_models(prompt, model_providers)
+
+    # Save to history for each model
+    if save_to_history:
+        for model_provider, model_result in results.items():
+            if model_result["result"]:
+                save_history(
+                    user_text,
+                    task,
+                    prompt,
+                    model_provider,
+                    model_result["result"],
+                    custom_prompt if custom_prompt else None,
+                )
+
+    return jsonify({"results": results, "prompt": prompt})
+
+
+@app.route("/history", methods=["GET"])
+def get_history():
+    """Get history of requests"""
+    limit = request.args.get("limit", 50, type=int)
+    history = load_history(limit)
+    return jsonify({"history": history})
+
+
+@app.route("/history/<int:history_id>", methods=["DELETE"])
+def delete_history_item(history_id):
+    """Delete a specific history item"""
+    try:
+        import json
+        from utils.history_utils import HISTORY_FILE, load_history
+
+        history = load_history(limit=None)
+        history = [h for h in history if h.get("id") != history_id]
+
+        with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/export", methods=["POST"])
+def export_results():
+    """Export results to file"""
+    data = request.json
+    export_format = data.get("format", "json")  # json or txt
+    results = data.get("results", {})
+    prompt = data.get("prompt", "")
+
+    try:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        if export_format == "json":
+            import json
+
+            export_data = {
+                "timestamp": datetime.now().isoformat(),
+                "prompt": prompt,
+                "results": results,
+            }
+            filename = f"export_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(export_data, f, ensure_ascii=False, indent=2)
+
+            return send_file(filename, as_attachment=True, download_name=filename)
+
+        else:  # txt
+            filename = f"export_{timestamp}.txt"
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write(
+                    f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                )
+                f.write(f"{'='*60}\n\n")
+                f.write(f"Prompt:\n{prompt}\n\n")
+                f.write(f"{'='*60}\n\n")
+                f.write("Results:\n\n")
+                for model, result_data in results.items():
+                    f.write(f"Model: {model.upper()}\n")
+                    f.write(f"{'-'*60}\n")
+                    if isinstance(result_data, dict):
+                        if result_data.get("error"):
+                            f.write(f"Error: {result_data['error']}\n\n")
+                        else:
+                            f.write(f"{result_data.get('result', 'N/A')}\n\n")
+                    else:
+                        f.write(f"{result_data}\n\n")
+
+            return send_file(filename, as_attachment=True, download_name=filename)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/health")
+def health():
+    """Health check endpoint"""
+    return jsonify(
+        {
+            "status": "ok",
+            "providers": {
+                "gpt": {
+                    "available": bool(OPENAI_API_KEY),
+                    "configured": bool(OPENAI_API_KEY),
+                },
+                "deepseek": {
+                    "available": bool(DEEPSEEK_API_KEY),
+                    "configured": bool(DEEPSEEK_API_KEY),
+                },
+                "gemini": {
+                    "available": bool(GEMINI_API_KEY),
+                    "configured": bool(GEMINI_API_KEY),
+                },
+            },
+        }
+    )
+
+
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=5000)

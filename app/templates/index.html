@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Purpose LLM Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3), transparent),
+                radial-gradient(circle at 80% 80%, rgba(255, 119, 198, 0.2), transparent),
+                radial-gradient(circle at 40% 20%, rgba(67, 233, 123, 0.2), transparent);
+            pointer-events: none;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.5),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            max-width: 1000px;
+            width: 100%;
+            padding: 50px;
+            position: relative;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        h1 {
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            font-size: 3em;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            font-weight: 400;
+        }
+
+        .powered-by {
+            text-align: center;
+            color: #999;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .ollama-logo {
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        #modelSelect {
+            font-family: inherit;
+        }
+
+        #modelSelect:hover {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #modelSelect:focus {
+            outline: none;
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #customPrompt:hover {
+            border-color: #d0d0d0;
+            background: #fff;
+        }
+
+        #customPrompt:focus {
+            outline: none;
+            border-color: #667eea;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        #userInput {
+            width: 100%;
+            min-height: 160px;
+            padding: 18px;
+            border: 2px solid #e8e8e8;
+            border-radius: 16px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            transition: all 0.3s ease;
+            background: #fafafa;
+            line-height: 1.6;
+        }
+
+        #userInput:hover {
+            border-color: #d0d0d0;
+            background: #fff;
+        }
+
+        #userInput:focus {
+            outline: none;
+            border-color: #667eea;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .buttons-section {
+            margin-bottom: 30px;
+        }
+
+        .buttons-label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .task-button {
+            padding: 18px 28px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: white;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .task-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .task-button:hover::before {
+            left: 100%;
+        }
+
+        .task-button:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .task-button:active {
+            transform: translateY(-1px) scale(0.98);
+        }
+
+        .task-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-summarize {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .btn-translate {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-explain {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .btn-keywords {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .btn-code {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .btn-chat {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .result-section {
+            margin-top: 30px;
+        }
+
+        .result-label {
+            display: block;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        #result {
+            width: 100%;
+            min-height: 180px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border: 2px solid #e8e8e8;
+            border-radius: 16px;
+            font-size: 16px;
+            font-family: inherit;
+            word-wrap: break-word;
+            line-height: 1.7;
+            color: #333;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        #result.has-content {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            border-color: #667eea;
+        }
+
+        /* Markdown styling */
+        #result h1,
+        #result h2,
+        #result h3,
+        #result h4,
+        #result h5,
+        #result h6 {
+            margin: 1em 0 0.5em 0;
+            font-weight: 700;
+            color: #333;
+        }
+
+        #result h1 {
+            font-size: 1.8em;
+            border-bottom: 2px solid #e8e8e8;
+            padding-bottom: 0.3em;
+        }
+
+        #result h2 {
+            font-size: 1.5em;
+            border-bottom: 1px solid #e8e8e8;
+            padding-bottom: 0.3em;
+        }
+
+        #result h3 {
+            font-size: 1.3em;
+        }
+
+        #result strong,
+        #result b {
+            font-weight: 700;
+            color: #333;
+        }
+
+        #result em,
+        #result i {
+            font-style: italic;
+        }
+
+        #result code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+
+        #result pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border-left: 4px solid #667eea;
+            margin: 1em 0;
+        }
+
+        #result pre code {
+            background: none;
+            padding: 0;
+            color: #333;
+        }
+
+        #result ul,
+        #result ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+
+        #result li {
+            margin: 0.5em 0;
+        }
+
+        #result blockquote {
+            border-left: 4px solid #667eea;
+            padding-left: 1em;
+            margin: 1em 0;
+            color: #666;
+            font-style: italic;
+        }
+
+        #result a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        #result a:hover {
+            text-decoration: underline;
+        }
+
+        #result hr {
+            border: none;
+            border-top: 2px solid #e8e8e8;
+            margin: 2em 0;
+        }
+
+        #result table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }
+
+        #result table th,
+        #result table td {
+            border: 1px solid #e8e8e8;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        #result table th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+
+        #result p {
+            margin: 0.8em 0;
+        }
+
+        /* Markdown styling for compare results */
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3,
+        .markdown-content h4,
+        .markdown-content h5,
+        .markdown-content h6 {
+            margin: 1em 0 0.5em 0;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .markdown-content strong,
+        .markdown-content b {
+            font-weight: 700;
+        }
+
+        .markdown-content code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #e83e8c;
+        }
+
+        .markdown-content pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border-left: 4px solid #667eea;
+            margin: 1em 0;
+        }
+
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+            color: #333;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin: 1em 0;
+            padding-left: 2em;
+        }
+
+        .markdown-content li {
+            margin: 0.5em 0;
+        }
+
+        .markdown-content a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .markdown-content a:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 25px 0;
+        }
+
+        .loading.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .spinner-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.1);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .loading-dots {
+            display: inline-block;
+            animation: dots 1.4s infinite;
+        }
+
+        @keyframes dots {
+
+            0%,
+            20% {
+                content: '.';
+            }
+
+            40% {
+                content: '..';
+            }
+
+            60%,
+            100% {
+                content: '...';
+            }
+        }
+
+        .error {
+            color: #dc3545;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe0e0 100%);
+            padding: 18px;
+            border-radius: 12px;
+            margin-top: 20px;
+            border: 2px solid #ffcccb;
+            font-weight: 500;
+        }
+
+        .footer {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 2px solid #f0f0f0;
+            text-align: center;
+        }
+
+        .provider-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 12px 24px;
+            border-radius: 50px;
+            color: #666;
+            font-size: 0.95em;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .team-info {
+            margin-bottom: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .team-info h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            font-weight: 700;
+        }
+
+        .team-table {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            border-collapse: collapse;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .team-table th {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 12px 20px;
+            font-weight: 700;
+            text-align: left;
+        }
+
+        .team-table td {
+            padding: 12px 20px;
+            color: #333;
+            border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        }
+
+        .team-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .team-table tr:hover {
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #43e97b;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px;
+            }
+
+            h1 {
+                font-size: 2.2em;
+            }
+
+            .team-table {
+                max-width: 100%;
+                font-size: 0.9em;
+            }
+
+            .team-table th,
+            .team-table td {
+                padding: 10px 15px;
+            }
+
+            .team-info {
+                padding: 15px;
+            }
+
+            .team-info h3 {
+                font-size: 1.1em;
+            }
+
+            .button-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .subtitle {
+                font-size: 1em;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="ai-badge">
+                ⚡ Hỗ trợ bởi AI
+            </div>
+            <h1>Công Cụ LLM Đa Năng</h1>
+            <p class="subtitle">Biến đổi văn bản của bạn với sức mạnh của AI</p>
+            <p class="powered-by">
+                <span class="status-dot"></span>
+                Được hỗ trợ bởi <span class="ollama-logo">GPT • Deepseek • Gemini</span>
+            </p>
+        </div>
+
+        <div class="input-section">
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                <label for="userInput" style="margin-bottom: 0;">Văn bản của bạn:</label>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                        <input type="checkbox" id="compareMode" style="width: 18px; height: 18px; cursor: pointer;">
+                        <span>Chế độ so sánh</span>
+                    </label>
+                    <div id="singleModelSelector" style="display: block;">
+                        <label for="modelSelect" style="margin-bottom: 0;">
+                            Mô hình:
+                            <select id="modelSelect"
+                                style="margin-left: 5px; padding: 8px 16px; border: 2px solid #e8e8e8; border-radius: 8px; font-size: 15px; font-weight: 600; background: white; cursor: pointer; transition: all 0.3s ease;">
+                                <option value="gpt">GPT (OpenAI)</option>
+                                <option value="deepseek">Deepseek</option>
+                                <option value="gemini">Gemini (Google)</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div id="multiModelSelector" style="display: none; flex-wrap: wrap; gap: 10px;">
+                        <span style="font-weight: 600;">Chọn nhiều mô hình:</span>
+                        <label style="cursor: pointer;"><input type="checkbox" class="model-checkbox" value="gpt"
+                                checked>
+                            GPT</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="model-checkbox" value="deepseek">
+                            Deepseek</label>
+                        <label style="cursor: pointer;"><input type="checkbox" class="model-checkbox" value="gemini">
+                            Gemini</label>
+                    </div>
+                </div>
+            </div>
+            <textarea id="userInput" placeholder="Nhập văn bản của bạn tại đây..."></textarea>
+
+            <div style="margin-top: 15px;">
+                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; margin-bottom: 10px;">
+                    <input type="checkbox" id="customPromptToggle" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span style="font-weight: 600;">Tùy chỉnh prompt</span>
+                </label>
+                <textarea id="customPrompt"
+                    placeholder="Nhập prompt tùy chỉnh của bạn tại đây (sẽ thay thế prompt mặc định)..."
+                    style="width: 100%; min-height: 100px; padding: 15px; border: 2px solid #e8e8e8; border-radius: 12px; font-size: 14px; font-family: inherit; resize: vertical; display: none; background: #fafafa; line-height: 1.6; transition: all 0.3s ease;"></textarea>
+            </div>
+        </div>
+
+        <div class="buttons-section">
+            <span class="buttons-label">Chọn chức năng:</span>
+            <div class="button-grid">
+                <button class="task-button btn-summarize" data-task="summarize">
+                    📝 Tóm tắt
+                </button>
+                <button class="task-button btn-translate" data-task="translate">
+                    🇫🇷 Dịch sang tiếng Pháp
+                </button>
+                <button class="task-button btn-explain" data-task="explain">
+                    👶 Giải thích đơn giản
+                </button>
+                <button class="task-button btn-keywords" data-task="keywords">
+                    🔑 Trích xuất từ khóa
+                </button>
+                <button class="task-button btn-code" data-task="code">
+                    💻 Tạo code Python
+                </button>
+                <button class="task-button btn-chat" data-task="chat">
+                    💬 Chat
+                </button>
+            </div>
+        </div>
+
+        <div class="loading">
+            <div class="spinner-container">
+                <div class="spinner"></div>
+                <span class="loading-text">Đang xử lý yêu cầu<span class="loading-dots">...</span></span>
+            </div>
+        </div>
+
+        <div class="result-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span class="result-label">Kết quả:</span>
+                <div id="exportButtons" style="display: none; gap: 10px;">
+                    <button id="exportJson"
+                        style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">📥
+                        Export JSON</button>
+                    <button id="exportTxt"
+                        style="padding: 8px 16px; background: #43e97b; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">📄
+                        Export TXT</button>
+                </div>
+            </div>
+            <div id="result">✨ Kết quả từ AI sẽ hiển thị tại đây...</div>
+            <div id="compareResults" style="display: none; margin-top: 20px;"></div>
+        </div>
+
+        <div style="margin-top: 30px; border-top: 2px solid #f0f0f0; padding-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #333;">📚 Lịch sử</h3>
+                <button id="refreshHistory"
+                    style="padding: 8px 16px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600;">🔄
+                    Làm mới</button>
+            </div>
+            <div id="historyContainer"
+                style="max-height: 400px; overflow-y: auto; border: 2px solid #e8e8e8; border-radius: 12px; padding: 15px; background: #fafafa;">
+                <div style="text-align: center; color: #999; padding: 20px;">Đang tải lịch sử...</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="team-info">
+                <h3>👥 Thành viên nhóm</h3>
+                <table class="team-table">
+                    <thead>
+                        <tr>
+                            <th>Họ và tên</th>
+                            <th>MSSV</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Lê Tấn Kiên</td>
+                            <td>2591309</td>
+                        </tr>
+                        <tr>
+                            <td>Đỗ Quốc Khánh</td>
+                            <td>2591307</td>
+                        </tr>
+                        <tr>
+                            <td>Nguyễn Trương Hoàng Hiếu</td>
+                            <td>2591304</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="provider-info" id="providerInfo">
+                <span class="status-dot"></span>
+                Đang tải...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentResults = {};
+        let currentPrompt = '';
+        const userInput = document.getElementById('userInput');
+        const resultDiv = document.getElementById('result');
+        const compareResultsDiv = document.getElementById('compareResults');
+        const loadingDiv = document.querySelector('.loading');
+        const taskButtons = document.querySelectorAll('.task-button');
+        const providerInfo = document.getElementById('providerInfo');
+        const modelSelect = document.getElementById('modelSelect');
+        const compareMode = document.getElementById('compareMode');
+        const customPromptToggle = document.getElementById('customPromptToggle');
+        const customPrompt = document.getElementById('customPrompt');
+        const exportButtons = document.getElementById('exportButtons');
+        const exportJson = document.getElementById('exportJson');
+        const exportTxt = document.getElementById('exportTxt');
+        const historyContainer = document.getElementById('historyContainer');
+        const refreshHistory = document.getElementById('refreshHistory');
+
+        // Model display names
+        const modelNames = {
+            'gpt': 'GPT (OpenAI)',
+            'deepseek': 'Deepseek',
+            'gemini': 'Gemini (Google)'
+        };
+
+        // Markdown parser function
+        function parseMarkdown(text) {
+            if (!text) return '';
+
+            let html = text;
+            const codeBlocks = [];
+            let codeBlockIndex = 0;
+
+            // Step 1: Protect code blocks (store and replace with placeholder)
+            html = html.replace(/```[\s\S]*?```/g, function (match) {
+                const placeholder = `__CODE_BLOCK_${codeBlockIndex}__`;
+                codeBlocks[codeBlockIndex] = match;
+                codeBlockIndex++;
+                return placeholder;
+            });
+
+            // Step 2: Escape HTML entities (but not in code blocks)
+            html = html.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+            // Step 3: Headers (handle after escaping)
+            html = html.replace(/^### (.*)$/gim, '<h3>$1</h3>');
+            html = html.replace(/^## (.*)$/gim, '<h2>$1</h2>');
+            html = html.replace(/^# (.*)$/gim, '<h1>$1</h1>');
+
+            // Step 4: Horizontal rule
+            html = html.replace(/^---$/gim, '<hr>');
+
+            // Step 5: Blockquotes
+            html = html.replace(/^&gt; (.*)$/gim, '<blockquote>$1</blockquote>');
+
+            // Step 6: Unordered lists
+            html = html.replace(/^[\*\-] (.+)$/gim, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>)/s, function (match) {
+                return '<ul>' + match + '</ul>';
+            });
+
+            // Step 7: Ordered lists
+            html = html.replace(/^\d+\. (.+)$/gim, '<li>$1</li>');
+
+            // Step 8: Links [text](url)
+            html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+            // Step 9: Bold (handle **bold** and __bold__)
+            html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+
+            // Step 10: Italic (handle *italic* and _italic_)
+            html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+            // Step 11: Inline code (handle `code`)
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+            // Step 12: Restore code blocks with proper formatting
+            for (let i = 0; i < codeBlocks.length; i++) {
+                const codeBlock = codeBlocks[i];
+                const placeholder = `__CODE_BLOCK_${i}__`;
+                // Remove ``` markers and format
+                const codeContent = codeBlock.replace(/```\w*\n?/g, '').replace(/```/g, '');
+                html = html.replace(placeholder, '<pre><code>' + escapeHtml(codeContent) + '</code></pre>');
+            }
+
+            // Step 13: Convert line breaks to paragraphs
+            const lines = html.split('\n');
+            let result = [];
+            let currentParagraph = [];
+
+            lines.forEach(line => {
+                const trimmed = line.trim();
+                // If line starts with HTML tag, don't wrap in <p>
+                if (trimmed.startsWith('<') || trimmed === '' || trimmed.startsWith('</')) {
+                    if (currentParagraph.length > 0) {
+                        result.push('<p>' + currentParagraph.join(' ') + '</p>');
+                        currentParagraph = [];
+                    }
+                    if (trimmed !== '') {
+                        result.push(trimmed);
+                    }
+                } else {
+                    currentParagraph.push(trimmed);
+                }
+            });
+
+            if (currentParagraph.length > 0) {
+                result.push('<p>' + currentParagraph.join(' ') + '</p>');
+            }
+
+            html = result.join('\n');
+
+            // Clean up empty paragraphs and fix nested tags
+            html = html.replace(/<p>\s*<\/p>/g, '');
+            html = html.replace(/<p>(<[^>]+>)/g, '$1');
+            html = html.replace(/(<\/[^>]+>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<pre>)/g, '$1');
+            html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<h[1-6]>)/g, '$1');
+            html = html.replace(/(<\/h[1-6]>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<ul>)/g, '$1');
+            html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<blockquote>)/g, '$1');
+            html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
+
+            return html;
+        }
+
+        // Helper function to escape HTML
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // Toggle compare mode
+        compareMode.addEventListener('change', function () {
+            const singleSelector = document.getElementById('singleModelSelector');
+            const multiSelector = document.getElementById('multiModelSelector');
+            if (this.checked) {
+                singleSelector.style.display = 'none';
+                multiSelector.style.display = 'flex';
+            } else {
+                singleSelector.style.display = 'block';
+                multiSelector.style.display = 'none';
+            }
+        });
+
+        // Toggle custom prompt
+        customPromptToggle.addEventListener('change', function () {
+            customPrompt.style.display = this.checked ? 'block' : 'none';
+        });
+
+        // Load provider info
+        fetch('/health')
+            .then(response => response.json())
+            .then(data => {
+                const providers = data.providers;
+                let statusHtml = '<span class="status-dot"></span> ';
+                const availableModels = [];
+
+                if (providers.gpt.configured) {
+                    availableModels.push('GPT');
+                }
+                if (providers.deepseek.configured) {
+                    availableModels.push('Deepseek');
+                }
+                if (providers.gemini.configured) {
+                    availableModels.push('Gemini');
+                }
+
+                statusHtml += availableModels.length > 0
+                    ? `Mô hình khả dụng: ${availableModels.join(', ')}`
+                    : 'Đang tải...';
+
+                providerInfo.innerHTML = statusHtml;
+            })
+            .catch(error => {
+                providerInfo.innerHTML = '<span class="status-dot" style="background: #dc3545;"></span> Không thể kết nối';
+            });
+
+        // Load history on page load
+        loadHistory();
+
+        // Refresh history button
+        refreshHistory.addEventListener('click', loadHistory);
+
+        // Export buttons
+        exportJson.addEventListener('click', () => exportResults('json'));
+        exportTxt.addEventListener('click', () => exportResults('txt'));
+
+        // Add click event to all task buttons
+        taskButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const task = button.getAttribute('data-task');
+                processTask(task);
+            });
+        });
+
+        async function processTask(task) {
+            const text = userInput.value.trim();
+            const isCompareMode = compareMode.checked;
+            const customPromptValue = customPromptToggle.checked ? customPrompt.value.trim() : '';
+
+            if (!text && !customPromptValue) {
+                resultDiv.innerHTML = '<span class="error">⚠️ Vui lòng nhập văn bản hoặc prompt tùy chỉnh!</span>';
+                return;
+            }
+
+            // Show loading
+            loadingDiv.classList.add('active');
+            taskButtons.forEach(btn => btn.disabled = true);
+            modelSelect.disabled = true;
+            compareMode.disabled = true;
+            document.querySelectorAll('.model-checkbox').forEach(cb => cb.disabled = true);
+            customPrompt.disabled = true;
+
+            try {
+                if (isCompareMode) {
+                    // Compare mode
+                    const selectedModels = Array.from(document.querySelectorAll('.model-checkbox:checked'))
+                        .map(cb => cb.value);
+
+                    if (selectedModels.length === 0) {
+                        throw new Error('Vui lòng chọn ít nhất một mô hình!');
+                    }
+
+                    resultDiv.style.display = 'block';
+                    resultDiv.textContent = `Đang so sánh với ${selectedModels.length} mô hình...`;
+
+                    const response = await fetch('/compare', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: text,
+                            task: task,
+                            models: selectedModels,
+                            custom_prompt: customPromptValue
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        currentResults = data.results;
+                        currentPrompt = data.prompt;
+                        displayCompareResults(data.results);
+                        exportButtons.style.display = 'flex';
+                    } else {
+                        resultDiv.innerHTML = `<span class="error">❌ Lỗi: ${data.error}</span>`;
+                    }
+                } else {
+                    // Single model mode
+                    const selectedModel = modelSelect.value;
+                    resultDiv.textContent = `Đang xử lý với ${modelNames[selectedModel]}...`;
+
+                    const response = await fetch('/process', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            text: text,
+                            task: task,
+                            model: selectedModel,
+                            custom_prompt: customPromptValue
+                        })
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok) {
+                        currentResults = { [selectedModel]: { result: data.result } };
+                        currentPrompt = data.prompt;
+                        resultDiv.style.display = 'block';
+                        resultDiv.innerHTML = parseMarkdown(data.result);
+                        resultDiv.classList.add('has-content');
+                        compareResultsDiv.style.display = 'none';
+                        compareResultsDiv.innerHTML = '';
+                        exportButtons.style.display = 'flex';
+                    } else {
+                        resultDiv.innerHTML = `<span class="error">❌ Lỗi: ${data.error}</span>`;
+                        resultDiv.classList.remove('has-content');
+                    }
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<span class="error">❌ Lỗi kết nối: ${error.message}</span>`;
+            } finally {
+                loadingDiv.classList.remove('active');
+                taskButtons.forEach(btn => btn.disabled = false);
+                modelSelect.disabled = false;
+                compareMode.disabled = false;
+                document.querySelectorAll('.model-checkbox').forEach(cb => cb.disabled = false);
+                customPrompt.disabled = false;
+                loadHistory();
+            }
+        }
+
+        function displayCompareResults(results) {
+            resultDiv.style.display = 'none';
+            compareResultsDiv.style.display = 'block';
+
+            let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
+
+            for (const [model, data] of Object.entries(results)) {
+                const resultText = data.error
+                    ? `<span style="color: #dc3545;">❌ ${data.error}</span>`
+                    : parseMarkdown(data.result || 'Không có kết quả');
+                html += `
+                    <div style="border: 2px solid #e8e8e8; border-radius: 12px; padding: 15px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <h4 style="margin: 0 0 10px 0; color: #667eea; font-size: 1.1em;">${modelNames[model] || model}</h4>
+                        <div style="max-height: 400px; overflow-y: auto; word-wrap: break-word; line-height: 1.6; color: #333;" class="markdown-content">
+                            ${resultText}
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+            compareResultsDiv.innerHTML = html;
+        }
+
+        async function exportResults(format) {
+            if (Object.keys(currentResults).length === 0) {
+                alert('Không có kết quả để xuất!');
+                return;
+            }
+
+            try {
+                const response = await fetch('/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        format: format,
+                        results: currentResults,
+                        prompt: currentPrompt
+                    })
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `export_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.${format}`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    alert('Lỗi xuất file: ' + error.error);
+                }
+            } catch (error) {
+                alert('Lỗi xuất file: ' + error.message);
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch('/history?limit=20');
+                const data = await response.json();
+
+                if (data.history && data.history.length > 0) {
+                    let html = '';
+                    data.history.reverse().forEach(entry => {
+                        const date = new Date(entry.timestamp).toLocaleString('vi-VN');
+                        html += `
+                            <div style="background: white; border: 1px solid #e8e8e8; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                                    <div>
+                                        <strong style="color: #667eea;">${modelNames[entry.model] || entry.model}</strong>
+                                        <span style="color: #999; font-size: 0.9em; margin-left: 10px;">${entry.task || 'Custom'}</span>
+                                    </div>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <span style="color: #999; font-size: 0.85em;">${date}</span>
+                                        <button onclick="deleteHistoryItem(${entry.id})" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em;">Xóa</button>
+                                    </div>
+                                </div>
+                                <div style="color: #666; font-size: 0.9em; margin-bottom: 8px;">
+                                    <strong>Input:</strong> ${entry.user_text.substring(0, 100)}${entry.user_text.length > 100 ? '...' : ''}
+                                </div>
+                                <div style="color: #333; white-space: pre-wrap; word-wrap: break-word; max-height: 100px; overflow-y: auto; font-size: 0.85em; background: #f8f9fa; padding: 8px; border-radius: 4px;">
+                                    ${entry.result.substring(0, 200)}${entry.result.length > 200 ? '...' : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    historyContainer.innerHTML = html;
+                } else {
+                    historyContainer.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">Chưa có lịch sử</div>';
+                }
+            } catch (error) {
+                historyContainer.innerHTML = '<div style="text-align: center; color: #dc3545; padding: 20px;">Lỗi tải lịch sử</div>';
+            }
+        }
+
+        // Make deleteHistoryItem globally accessible
+        window.deleteHistoryItem = async function (id) {
+            if (!confirm('Bạn có chắc muốn xóa mục này?')) return;
+
+            try {
+                const response = await fetch(`/history/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    loadHistory();
+                }
+            } catch (error) {
+                alert('Lỗi xóa mục lịch sử');
+            }
+        }
+
+        // Optional: Allow Enter key to submit (Ctrl+Enter)
+        userInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                taskButtons[0].click();
+            }
+        });
+    </script>
+</body>
+
+</html>
