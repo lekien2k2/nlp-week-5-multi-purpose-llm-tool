@@ -317,31 +317,63 @@ def delete_history_item(history_id):
 @app.route("/export", methods=["POST"])
 def export_results():
     """Export results to file"""
+    import tempfile
+    import json
+    import threading
+
     data = request.json
     export_format = data.get("format", "json")  # json or txt
     results = data.get("results", {})
     prompt = data.get("prompt", "")
 
+    if not results:
+        return jsonify({"error": "No results to export"}), 400
+
     try:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         if export_format == "json":
-            import json
-
             export_data = {
                 "timestamp": datetime.now().isoformat(),
                 "prompt": prompt,
                 "results": results,
             }
             filename = f"export_{timestamp}.json"
-            with open(filename, "w", encoding="utf-8") as f:
-                json.dump(export_data, f, ensure_ascii=False, indent=2)
 
-            return send_file(filename, as_attachment=True, download_name=filename)
+            # Use tempfile to avoid file accumulation
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", delete=False, suffix=".json"
+            ) as tmp_file:
+                json.dump(export_data, tmp_file, ensure_ascii=False, indent=2)
+                tmp_filename = tmp_file.name
+
+            # Delete file after sending (delay 5 seconds)
+            def cleanup():
+                import time
+
+                time.sleep(5)
+                try:
+                    if os.path.exists(tmp_filename):
+                        os.unlink(tmp_filename)
+                except:
+                    pass
+
+            threading.Thread(target=cleanup, daemon=True).start()
+
+            return send_file(
+                tmp_filename,
+                as_attachment=True,
+                download_name=filename,
+                mimetype="application/json",
+            )
 
         else:  # txt
             filename = f"export_{timestamp}.txt"
-            with open(filename, "w", encoding="utf-8") as f:
+
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", delete=False, suffix=".txt"
+            ) as tmp_file:
+                f = tmp_file
                 f.write(
                     f"Export Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                 )
@@ -349,18 +381,49 @@ def export_results():
                 f.write(f"Prompt:\n{prompt}\n\n")
                 f.write(f"{'='*60}\n\n")
                 f.write("Results:\n\n")
+
                 for model, result_data in results.items():
                     f.write(f"Model: {model.upper()}\n")
                     f.write(f"{'-'*60}\n")
+
                     if isinstance(result_data, dict):
                         if result_data.get("error"):
                             f.write(f"Error: {result_data['error']}\n\n")
+                        elif result_data.get("self_critique"):
+                            # Handle self-critique data
+                            critique = result_data.get("self_critique", {})
+                            f.write("📝 Câu trả lời ban đầu:\n")
+                            f.write(f"{critique.get('initial_answer', 'N/A')}\n\n")
+                            f.write("🔍 Đánh giá và phân tích:\n")
+                            f.write(f"{critique.get('critique_analysis', 'N/A')}\n\n")
+                            f.write("✨ Kết quả cải thiện:\n")
+                            f.write(f"{critique.get('improved_answer', 'N/A')}\n\n")
                         else:
                             f.write(f"{result_data.get('result', 'N/A')}\n\n")
                     else:
                         f.write(f"{result_data}\n\n")
 
-            return send_file(filename, as_attachment=True, download_name=filename)
+                tmp_filename = tmp_file.name
+
+            # Delete file after sending (delay 5 seconds)
+            def cleanup():
+                import time
+
+                time.sleep(5)
+                try:
+                    if os.path.exists(tmp_filename):
+                        os.unlink(tmp_filename)
+                except:
+                    pass
+
+            threading.Thread(target=cleanup, daemon=True).start()
+
+            return send_file(
+                tmp_filename,
+                as_attachment=True,
+                download_name=filename,
+                mimetype="text/plain",
+            )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
