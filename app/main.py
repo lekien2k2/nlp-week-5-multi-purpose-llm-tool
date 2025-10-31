@@ -69,7 +69,7 @@ def process():
     user_text = data.get("text", "").strip()
     task = data.get("task", "")
     model_provider = data.get("model", "gpt").lower()
-    custom_prompt = data.get("custom_prompt", "").strip()
+    self_critique = data.get("self_critique", False)
     save_to_history = data.get("save_history", True)
 
     if not user_text:
@@ -77,7 +77,7 @@ def process():
 
     # Validate task (allow "chat" as a special task)
     valid_tasks = list(TASK_PROMPTS.keys()) + ["chat"]
-    if task not in valid_tasks and not custom_prompt:
+    if task not in valid_tasks:
         return jsonify({"error": "Invalid task"}), 400
 
     # Validate model provider
@@ -93,9 +93,7 @@ def process():
         )
 
     # Create the full prompt
-    if custom_prompt:
-        prompt = custom_prompt
-    elif task == "chat":
+    if task == "chat":
         # For chat, use user_text directly without any prompt template
         prompt = user_text
     else:
@@ -103,21 +101,75 @@ def process():
         # Add Vietnamese instruction if needed
         prompt = add_language_instruction(prompt, user_text, task)
 
-    # Call the appropriate model
-    result = call_model(prompt, model_provider)
+    if self_critique:
+        # Get initial answer first
+        initial_result = call_model(prompt, model_provider)
 
-    # Save to history
-    if save_to_history:
-        save_history(
-            user_text,
-            task,
-            prompt,
-            model_provider,
-            result,
-            custom_prompt if custom_prompt else None,
+        # Create critique prompt
+        critique_prompt = f"""Câu trả lời ban đầu của bạn:
+{initial_result}
+
+Hãy đánh giá câu trả lời trên và xác định các điểm cần cải thiện về:
+- Tính chính xác
+- Tính đầy đủ
+- Tính rõ ràng
+- Khả năng áp dụng
+
+Sau đó đưa ra phiên bản cải thiện của câu trả lời."""
+
+        # Get improved answer
+        improved_result = call_model(critique_prompt, model_provider)
+
+        # Create critique analysis (asking model to analyze what needs improvement)
+        analysis_prompt = f"""Câu trả lời ban đầu:
+{initial_result}
+
+Hãy phân tích và chỉ ra những điểm cần cải thiện trong câu trả lời trên. Đưa ra đánh giá ngắn gọn về:
+1. Điểm mạnh
+2. Điểm yếu cần cải thiện
+3. Gợi ý cải thiện"""
+
+        critique_analysis = call_model(analysis_prompt, model_provider)
+
+        # Combine full prompt for history
+        full_prompt = prompt
+
+        # Save to history with improved result
+        if save_to_history:
+            save_history(
+                user_text,
+                task,
+                full_prompt,
+                model_provider,
+                improved_result,
+            )
+
+        return jsonify(
+            {
+                "result": improved_result,
+                "prompt": full_prompt,
+                "self_critique": {
+                    "initial_answer": initial_result,
+                    "critique_analysis": critique_analysis,
+                    "improved_answer": improved_result,
+                },
+            }
         )
+    else:
+        # Call the appropriate model
+        result = call_model(prompt, model_provider)
 
-    return jsonify({"result": result, "prompt": prompt})
+        # Save to history
+        if save_to_history:
+            save_history(
+                user_text,
+                task,
+                prompt,
+                model_provider,
+                result,
+            )
+
+        return jsonify({"result": result, "prompt": prompt})
 
 
 @app.route("/compare", methods=["POST"])
@@ -127,7 +179,7 @@ def compare():
     user_text = data.get("text", "").strip()
     task = data.get("task", "")
     model_providers = data.get("models", [])
-    custom_prompt = data.get("custom_prompt", "").strip()
+    self_critique = data.get("self_critique", False)
     save_to_history = data.get("save_history", True)
 
     if not user_text:
@@ -138,7 +190,7 @@ def compare():
 
     # Validate task (allow "chat" as a special task)
     valid_tasks = list(TASK_PROMPTS.keys()) + ["chat"]
-    if task not in valid_tasks and not custom_prompt:
+    if task not in valid_tasks:
         return jsonify({"error": "Invalid task"}), 400
 
     # Validate model providers
@@ -148,9 +200,7 @@ def compare():
             return jsonify({"error": f"Invalid model provider: {provider}"}), 400
 
     # Create the full prompt
-    if custom_prompt:
-        prompt = custom_prompt
-    elif task == "chat":
+    if task == "chat":
         # For chat, use user_text directly without any prompt template
         prompt = user_text
     else:
@@ -158,23 +208,84 @@ def compare():
         # Add Vietnamese instruction if needed
         prompt = add_language_instruction(prompt, user_text, task)
 
-    # Compare models
-    results = compare_models(prompt, model_providers)
+    if self_critique:
+        # For compare mode with self-critique, we need to handle each model separately
+        results = {}
 
-    # Save to history for each model
-    if save_to_history:
-        for model_provider, model_result in results.items():
-            if model_result["result"]:
-                save_history(
-                    user_text,
-                    task,
-                    prompt,
-                    model_provider,
-                    model_result["result"],
-                    custom_prompt if custom_prompt else None,
-                )
+        for model_provider in model_providers:
+            try:
+                # Get initial answer
+                initial_result = call_model(prompt, model_provider)
 
-    return jsonify({"results": results, "prompt": prompt})
+                # Create critique prompt
+                critique_prompt = f"""Câu trả lời ban đầu của bạn:
+{initial_result}
+
+Hãy đánh giá câu trả lời trên và xác định các điểm cần cải thiện về:
+- Tính chính xác
+- Tính đầy đủ
+- Tính rõ ràng
+- Khả năng áp dụng
+
+Sau đó đưa ra phiên bản cải thiện của câu trả lời."""
+
+                # Get improved answer
+                improved_result = call_model(critique_prompt, model_provider)
+
+                # Create critique analysis
+                analysis_prompt = f"""Câu trả lời ban đầu:
+{initial_result}
+
+Hãy phân tích và chỉ ra những điểm cần cải thiện trong câu trả lời trên. Đưa ra đánh giá ngắn gọn về:
+1. Điểm mạnh
+2. Điểm yếu cần cải thiện
+3. Gợi ý cải thiện"""
+
+                critique_analysis = call_model(analysis_prompt, model_provider)
+
+                results[model_provider] = {
+                    "result": improved_result,
+                    "error": None,
+                    "self_critique": {
+                        "initial_answer": initial_result,
+                        "critique_analysis": critique_analysis,
+                        "improved_answer": improved_result,
+                    },
+                }
+
+                # Save to history
+                if save_to_history:
+                    save_history(
+                        user_text,
+                        task,
+                        prompt,
+                        model_provider,
+                        improved_result,
+                    )
+            except Exception as e:
+                results[model_provider] = {
+                    "result": None,
+                    "error": str(e),
+                }
+
+        return jsonify({"results": results, "prompt": prompt})
+    else:
+        # Compare models without self-critique
+        results = compare_models(prompt, model_providers)
+
+        # Save to history for each model
+        if save_to_history:
+            for model_provider, model_result in results.items():
+                if model_result["result"]:
+                    save_history(
+                        user_text,
+                        task,
+                        prompt,
+                        model_provider,
+                        model_result["result"],
+                    )
+
+        return jsonify({"results": results, "prompt": prompt})
 
 
 @app.route("/history", methods=["GET"])

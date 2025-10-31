@@ -37,7 +37,7 @@
 
 - 🔄 **So sánh nhiều model**: Chạy cùng một prompt trên nhiều LLM và so sánh kết quả cạnh nhau
 - 📚 **Lịch sử**: Tự động lưu tất cả request/response để xem lại và quản lý
-- ✏️ **Tùy chỉnh prompt**: Cho phép nhập prompt hoàn toàn tùy chỉnh thay vì dùng prompt mặc định
+- 🔍 **Self-Critique**: Tự động đánh giá và cải thiện câu trả lời với 3 phần hiển thị: câu trả lời ban đầu, phân tích đánh giá, và kết quả cải thiện
 - 📥 **Export kết quả**: Xuất kết quả ra file JSON hoặc TXT
 - 🇻🇳 **Hỗ trợ tiếng Việt**: Tự động phát hiện và yêu cầu AI trả lời bằng tiếng Việt
 - 📝 **Markdown rendering**: Hiển thị kết quả với format đẹp (bold, italic, code, headings, lists, v.v.)
@@ -237,17 +237,15 @@ GEMINI_API_KEY=your-gemini-api-key-here
 
 4. **Di chuyển vào thư mục app và khởi động Flask server**:
 
-   **Cách 1: Chạy từ thư mục app/**
-
    ```bash
    cd app
-   python app.py
+   python main.py
    ```
 
-   **Cách 2: Chạy từ thư mục gốc**
+   Hoặc chạy từ thư mục gốc:
 
    ```bash
-   python -m app.app
+   python -m app.main
    ```
 
 5. **Xác nhận server đang chạy**, bạn sẽ thấy:
@@ -282,7 +280,7 @@ Nhấn `Ctrl + C` trong terminal để dừng server.
 1. **Ô nhập liệu**: Nhập văn bản cần xử lý hoặc câu hỏi
 2. **Chọn mô hình**: Dropdown để chọn model AI (GPT, Deepseek, hoặc Gemini)
 3. **Chế độ so sánh**: Checkbox để chọn so sánh nhiều model cùng lúc
-4. **Tùy chỉnh prompt**: Checkbox để nhập prompt hoàn toàn tùy chỉnh
+4. **Self-Critique**: Checkbox để bật tính năng tự đánh giá và cải thiện câu trả lời
 5. **6 nút chức năng**:
    - 📝 Summarize - Tóm tắt văn bản
    - 🇫🇷 Translate to French - Dịch sang tiếng Pháp
@@ -341,7 +339,7 @@ Nút **💬 Chat** cho phép bạn trò chuyện trực tiếp với AI:
 
 1. **Tick checkbox "Chế độ so sánh"**
 2. **Chọn các model** bạn muốn so sánh (có thể chọn nhiều)
-3. **Nhập văn bản** hoặc sử dụng prompt tùy chỉnh
+3. **Nhập văn bản** cần xử lý
 4. **Click một trong các nút chức năng** (hoặc Chat)
 5. **Xem kết quả** hiển thị cạnh nhau từ các model khác nhau
 6. **So sánh** chất lượng và phong cách của từng model
@@ -354,20 +352,27 @@ Nút **💬 Chat** cho phép bạn trò chuyện trực tiếp với AI:
 - Click "💬 Chat"
 - Xem 3 câu trả lời khác nhau cạnh nhau với markdown formatting đẹp
 
-### Tùy chỉnh prompt:
+### Sử dụng tính năng Self-Critique:
 
-1. **Tick checkbox "Tùy chỉnh prompt"**
-2. **Nhập prompt** của bạn vào textarea xuất hiện
-3. Prompt này sẽ **thay thế hoàn toàn** prompt mặc định từ các nút chức năng
-4. **Chọn model** và **click nút bất kỳ** (prompt tùy chỉnh sẽ được sử dụng)
+Self-Critique là tính năng cho phép AI tự đánh giá và cải thiện câu trả lời của chính nó. Khi bật tính năng này:
+
+1. **Tick checkbox "Self-Critique (Tự đánh giá và cải thiện)"**
+2. **Nhập văn bản** hoặc câu hỏi như bình thường
+3. **Chọn model** và **click một trong các nút chức năng**
+4. **Xem kết quả hiển thị 3 phần**:
+   - **📝 Câu trả lời ban đầu**: Kết quả đầu tiên từ AI
+   - **🔍 Đánh giá và phân tích**: Phân tích điểm mạnh, điểm yếu và gợi ý cải thiện
+   - **✨ Kết quả cải thiện**: Câu trả lời đã được cải thiện dựa trên phân tích
 
 **Ví dụ**:
 
-- Tick "Tùy chỉnh prompt"
-- Nhập: "Viết một bài thơ về mùa thu bằng tiếng Việt, 4 câu, thể thơ lục bát"
+- Tick "Self-Critique"
+- Nhập: "Giải thích về machine learning"
 - Chọn model GPT
-- Click nút bất kỳ
-- Nhận bài thơ theo yêu cầu
+- Click "💬 Chat"
+- Xem 3 phần kết quả: câu trả lời ban đầu → phân tích đánh giá → kết quả cải thiện
+
+**Lưu ý**: Tính năng này sẽ gọi model 3 lần (lần 1: câu trả lời ban đầu, lần 2: phân tích, lần 3: cải thiện), nên sẽ mất thời gian và chi phí nhiều hơn so với chế độ bình thường.
 
 ### Xem lịch sử:
 
@@ -420,7 +425,7 @@ Kết quả từ AI được tự động render markdown:
 nlp-day5/
 │
 ├── app/
-│   ├── app.py                      # Main Flask application
+│   ├── main.py                     # Main Flask application
 │   │   ├── Route '/'              # Trang chính
 │   │   ├── Route '/process'       # Xử lý request đơn lẻ
 │   │   ├── Route '/compare'       # So sánh nhiều model
@@ -459,7 +464,7 @@ nlp-day5/
 
 ### Giải thích các file chính:
 
-**app/app.py**:
+**app/main.py**:
 
 - Main Flask application
 - Xử lý HTTP requests và routing
@@ -587,7 +592,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 **Giải pháp**:
 
-Sửa file `app/app.py`, dòng cuối:
+Sửa file `app/main.py`, dòng cuối:
 
 ```python
 app.run(debug=True, host="0.0.0.0", port=5001)
@@ -629,13 +634,13 @@ Chạy từ thư mục `app/`:
 
 ```bash
 cd app
-python app.py
+python main.py
 ```
 
 Hoặc từ thư mục gốc:
 
 ```bash
-python -m app.app
+python -m app.main
 ```
 
 ### Lỗi 10: Gemini không hoạt động
@@ -648,7 +653,7 @@ python -m app.app
    ```bash
    pip install google-generativeai
    ```
-2. **Quan trọng**: Khởi động lại Flask server (Ctrl+C rồi chạy lại `python app.py`)
+2. **Quan trọng**: Khởi động lại Flask server (Ctrl+C rồi chạy lại `python main.py`)
 
 ---
 
@@ -670,7 +675,7 @@ python -m app.app
 
    ```bash
    cd app
-   python app.py
+   python main.py
    ```
 
    Nếu thấy "Running on http://127.0.0.1:5000" → Flask hoạt động ✅
@@ -699,7 +704,7 @@ python -m app.app
 ```bash
 cd app
 .\venv\Scripts\Activate.ps1  # Windows (nếu chưa activate)
-python app.py
+python main.py
 ```
 
 ### 2. Mở trình duyệt: http://localhost:5000
@@ -771,12 +776,12 @@ Output: [Python code hoàn chỉnh với markdown formatting]
 - Sau khi có kết quả, click "Export JSON" hoặc "Export TXT"
 - Show: File được download
 
-**Tùy chỉnh prompt**:
+**Self-Critique**:
 
-- Tick "Tùy chỉnh prompt"
-- Nhập prompt: "Viết một câu chuyện ngắn về robot"
-- Chọn model và click nút bất kỳ
-- Show: Kết quả từ prompt tùy chỉnh
+- Tick "Self-Critique"
+- Nhập: "Giải thích về artificial intelligence"
+- Chọn model và click "💬 Chat"
+- Show: 3 phần kết quả (câu trả lời ban đầu → phân tích → kết quả cải thiện)
 
 **Hỗ trợ tiếng Việt**:
 
@@ -801,7 +806,7 @@ Output: [Python code hoàn chỉnh với markdown formatting]
 - **Chat trực tiếp**: Tính năng chat không qua prompt template
 - **So sánh**: Có thể so sánh kết quả từ nhiều model cùng lúc
 - **Lịch sử**: Tự động lưu tất cả request/response
-- **Linh hoạt**: Cho phép tùy chỉnh prompt hoàn toàn
+- **Self-Critique**: Tự động đánh giá và cải thiện câu trả lời với phân tích chi tiết
 - **Export**: Xuất kết quả ra file để phân tích
 - **Hỗ trợ tiếng Việt**: Tự động phát hiện và yêu cầu trả lời bằng tiếng Việt
 - **Markdown rendering**: Hiển thị kết quả đẹp với format đúng
@@ -832,7 +837,7 @@ Output: [Python code hoàn chỉnh với markdown formatting]
 
 - **Models**: Mỗi LLM provider trong file riêng, dễ thêm/sửa
 - **Utils**: Các hàm tiện ích được tách riêng, dễ test và tái sử dụng
-- **Routes**: Business logic tập trung trong app.py
+- **Routes**: Business logic tập trung trong main.py
 - **Templates**: Giao diện tách biệt, dễ chỉnh sửa
 
 ---

@@ -132,17 +132,6 @@
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
-        #customPrompt:hover {
-            border-color: #d0d0d0;
-            background: #fff;
-        }
-
-        #customPrompt:focus {
-            outline: none;
-            border-color: #667eea;
-            background: #fff;
-            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-        }
 
         .input-section {
             margin-bottom: 30px;
@@ -697,14 +686,10 @@
     <div class="container">
         <div class="header">
             <div class="ai-badge">
-                ⚡ Hỗ trợ bởi AI
+                ⚡ LLM AI Multi-Model
             </div>
-            <h1>Công Cụ LLM Đa Năng</h1>
+            <h1>LLM AI Multi-Model</h1>
             <p class="subtitle">Biến đổi văn bản của bạn với sức mạnh của AI</p>
-            <p class="powered-by">
-                <span class="status-dot"></span>
-                Được hỗ trợ bởi <span class="ollama-logo">GPT • Deepseek • Gemini</span>
-            </p>
         </div>
 
         <div class="input-section">
@@ -742,13 +727,10 @@
             <textarea id="userInput" placeholder="Nhập văn bản của bạn tại đây..."></textarea>
 
             <div style="margin-top: 15px;">
-                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; margin-bottom: 10px;">
-                    <input type="checkbox" id="customPromptToggle" style="width: 18px; height: 18px; cursor: pointer;">
-                    <span style="font-weight: 600;">Tùy chỉnh prompt</span>
+                <label style="display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                    <input type="checkbox" id="selfCritiqueToggle" style="width: 18px; height: 18px; cursor: pointer;">
+                    <span style="font-weight: 600;">Self-Critique (Tự đánh giá và cải thiện)</span>
                 </label>
-                <textarea id="customPrompt"
-                    placeholder="Nhập prompt tùy chỉnh của bạn tại đây (sẽ thay thế prompt mặc định)..."
-                    style="width: 100%; min-height: 100px; padding: 15px; border: 2px solid #e8e8e8; border-radius: 12px; font-size: 14px; font-family: inherit; resize: vertical; display: none; background: #fafafa; line-height: 1.6; transition: all 0.3s ease;"></textarea>
             </div>
         </div>
 
@@ -857,8 +839,7 @@
         const providerInfo = document.getElementById('providerInfo');
         const modelSelect = document.getElementById('modelSelect');
         const compareMode = document.getElementById('compareMode');
-        const customPromptToggle = document.getElementById('customPromptToggle');
-        const customPrompt = document.getElementById('customPrompt');
+        const selfCritiqueToggle = document.getElementById('selfCritiqueToggle');
         const exportButtons = document.getElementById('exportButtons');
         const exportJson = document.getElementById('exportJson');
         const exportTxt = document.getElementById('exportTxt');
@@ -1002,10 +983,7 @@
             }
         });
 
-        // Toggle custom prompt
-        customPromptToggle.addEventListener('change', function () {
-            customPrompt.style.display = this.checked ? 'block' : 'none';
-        });
+        // Self-critique toggle is handled in processTask function
 
         // Load provider info
         fetch('/health')
@@ -1056,10 +1034,10 @@
         async function processTask(task) {
             const text = userInput.value.trim();
             const isCompareMode = compareMode.checked;
-            const customPromptValue = customPromptToggle.checked ? customPrompt.value.trim() : '';
+            const selfCritique = selfCritiqueToggle.checked;
 
-            if (!text && !customPromptValue) {
-                resultDiv.innerHTML = '<span class="error">⚠️ Vui lòng nhập văn bản hoặc prompt tùy chỉnh!</span>';
+            if (!text) {
+                resultDiv.innerHTML = '<span class="error">⚠️ Vui lòng nhập văn bản!</span>';
                 return;
             }
 
@@ -1069,7 +1047,7 @@
             modelSelect.disabled = true;
             compareMode.disabled = true;
             document.querySelectorAll('.model-checkbox').forEach(cb => cb.disabled = true);
-            customPrompt.disabled = true;
+            selfCritiqueToggle.disabled = true;
 
             try {
                 if (isCompareMode) {
@@ -1091,13 +1069,14 @@
                             text: text,
                             task: task,
                             models: selectedModels,
-                            custom_prompt: customPromptValue
+                            self_critique: selfCritique
                         })
                     });
 
                     const data = await response.json();
 
                     if (response.ok) {
+                        // Store results including self_critique data
                         currentResults = data.results;
                         currentPrompt = data.prompt;
                         displayCompareResults(data.results);
@@ -1117,17 +1096,49 @@
                             text: text,
                             task: task,
                             model: selectedModel,
-                            custom_prompt: customPromptValue
+                            self_critique: selfCritique
                         })
                     });
 
                     const data = await response.json();
 
                     if (response.ok) {
-                        currentResults = { [selectedModel]: { result: data.result } };
+                        // Store results with self_critique data if available
+                        if (data.self_critique) {
+                            currentResults = { [selectedModel]: { result: data.result, self_critique: data.self_critique } };
+                        } else {
+                            currentResults = { [selectedModel]: { result: data.result } };
+                        }
                         currentPrompt = data.prompt;
                         resultDiv.style.display = 'block';
-                        resultDiv.innerHTML = parseMarkdown(data.result);
+
+                        // Check if self-critique is enabled
+                        if (data.self_critique) {
+                            const critique = data.self_critique;
+                            resultDiv.innerHTML = `
+                                <div style="margin-bottom: 25px; padding: 20px; background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border-radius: 12px; border-left: 4px solid #667eea;">
+                                    <h3 style="margin: 0 0 15px 0; color: #667eea; font-size: 1.2em;">📝 Câu trả lời ban đầu</h3>
+                                    <div style="color: #333; line-height: 1.7;" class="markdown-content">
+                                        ${parseMarkdown(critique.initial_answer)}
+                                    </div>
+                                </div>
+                                <div style="margin-bottom: 25px; padding: 20px; background: linear-gradient(135deg, #fff5e6 0%, #fffbf0 100%); border-radius: 12px; border-left: 4px solid #f59e0b;">
+                                    <h3 style="margin: 0 0 15px 0; color: #f59e0b; font-size: 1.2em;">🔍 Đánh giá và phân tích</h3>
+                                    <div style="color: #333; line-height: 1.7;" class="markdown-content">
+                                        ${parseMarkdown(critique.critique_analysis)}
+                                    </div>
+                                </div>
+                                <div style="padding: 20px; background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); border-radius: 12px; border-left: 4px solid #43e97b;">
+                                    <h3 style="margin: 0 0 15px 0; color: #43e97b; font-size: 1.2em;">✨ Kết quả cải thiện</h3>
+                                    <div style="color: #333; line-height: 1.7;" class="markdown-content">
+                                        ${parseMarkdown(critique.improved_answer)}
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            resultDiv.innerHTML = parseMarkdown(data.result);
+                        }
+
                         resultDiv.classList.add('has-content');
                         compareResultsDiv.style.display = 'none';
                         compareResultsDiv.innerHTML = '';
@@ -1145,7 +1156,7 @@
                 modelSelect.disabled = false;
                 compareMode.disabled = false;
                 document.querySelectorAll('.model-checkbox').forEach(cb => cb.disabled = false);
-                customPrompt.disabled = false;
+                selfCritiqueToggle.disabled = false;
                 loadHistory();
             }
         }
@@ -1157,17 +1168,53 @@
             let html = '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">';
 
             for (const [model, data] of Object.entries(results)) {
-                const resultText = data.error
-                    ? `<span style="color: #dc3545;">❌ ${data.error}</span>`
-                    : parseMarkdown(data.result || 'Không có kết quả');
-                html += `
-                    <div style="border: 2px solid #e8e8e8; border-radius: 12px; padding: 15px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                        <h4 style="margin: 0 0 10px 0; color: #667eea; font-size: 1.1em;">${modelNames[model] || model}</h4>
-                        <div style="max-height: 400px; overflow-y: auto; word-wrap: break-word; line-height: 1.6; color: #333;" class="markdown-content">
-                            ${resultText}
+                if (data.error) {
+                    html += `
+                        <div style="border: 2px solid #e8e8e8; border-radius: 12px; padding: 15px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #667eea; font-size: 1.1em;">${modelNames[model] || model}</h4>
+                            <div style="color: #dc3545;">❌ ${data.error}</div>
                         </div>
-                    </div>
-                `;
+                    `;
+                } else if (data.self_critique) {
+                    // Display self-critique results
+                    const critique = data.self_critique;
+                    html += `
+                        <div style="border: 2px solid #e8e8e8; border-radius: 12px; padding: 15px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0 0 15px 0; color: #667eea; font-size: 1.1em;">${modelNames[model] || model}</h4>
+                            <div style="max-height: 600px; overflow-y: auto; word-wrap: break-word;">
+                                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 3px solid #667eea;">
+                                    <h5 style="margin: 0 0 10px 0; color: #667eea; font-size: 1em;">📝 Câu trả lời ban đầu</h5>
+                                    <div style="color: #333; line-height: 1.6; font-size: 0.9em;" class="markdown-content">
+                                        ${parseMarkdown(critique.initial_answer)}
+                                    </div>
+                                </div>
+                                <div style="margin-bottom: 20px; padding: 15px; background: #fff5e6; border-radius: 8px; border-left: 3px solid #f59e0b;">
+                                    <h5 style="margin: 0 0 10px 0; color: #f59e0b; font-size: 1em;">🔍 Đánh giá và phân tích</h5>
+                                    <div style="color: #333; line-height: 1.6; font-size: 0.9em;" class="markdown-content">
+                                        ${parseMarkdown(critique.critique_analysis)}
+                                    </div>
+                                </div>
+                                <div style="padding: 15px; background: #f0fdf4; border-radius: 8px; border-left: 3px solid #43e97b;">
+                                    <h5 style="margin: 0 0 10px 0; color: #43e97b; font-size: 1em;">✨ Kết quả cải thiện</h5>
+                                    <div style="color: #333; line-height: 1.6; font-size: 0.9em;" class="markdown-content">
+                                        ${parseMarkdown(critique.improved_answer)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Normal result display
+                    const resultText = parseMarkdown(data.result || 'Không có kết quả');
+                    html += `
+                        <div style="border: 2px solid #e8e8e8; border-radius: 12px; padding: 15px; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            <h4 style="margin: 0 0 10px 0; color: #667eea; font-size: 1.1em;">${modelNames[model] || model}</h4>
+                            <div style="max-height: 400px; overflow-y: auto; word-wrap: break-word; line-height: 1.6; color: #333;" class="markdown-content">
+                                ${resultText}
+                            </div>
+                        </div>
+                    `;
+                }
             }
 
             html += '</div>';

@@ -7,7 +7,7 @@ from datetime import datetime
 HISTORY_FILE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "history.json")
 
 
-def save_history(user_text, task, prompt, model_provider, result, custom_prompt=None):
+def save_history(user_text, task, prompt, model_provider, result):
     """Save request/response to history"""
     try:
         history = []
@@ -21,7 +21,6 @@ def save_history(user_text, task, prompt, model_provider, result, custom_prompt=
             "user_text": user_text,
             "task": task,
             "prompt": prompt,
-            "custom_prompt": custom_prompt if custom_prompt else False,
             "model": model_provider,
             "result": result,
         }
